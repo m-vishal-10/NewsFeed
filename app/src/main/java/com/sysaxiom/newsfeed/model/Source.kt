@@ -1,4 +1,4 @@
-package com.sysaxiom.newsfeed.Model
+package com.sysaxiom.newsfeed.model
 
 data class Source(
     val id: String?,

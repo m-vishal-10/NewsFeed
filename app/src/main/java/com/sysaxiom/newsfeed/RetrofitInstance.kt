@@ -1,5 +1,5 @@
 package com.sysaxiom.newsfeed
-import com.sysaxiom.newsfeed.Component.ApiInterface
+import com.sysaxiom.newsfeed.component.ApiInterface
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 

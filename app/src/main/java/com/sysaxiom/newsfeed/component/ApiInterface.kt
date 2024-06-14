@@ -1,6 +1,6 @@
-package com.sysaxiom.newsfeed.Component
+package com.sysaxiom.newsfeed.component
 
-import com.sysaxiom.newsfeed.Model.Welcome
+import com.sysaxiom.newsfeed.model.Welcome
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
