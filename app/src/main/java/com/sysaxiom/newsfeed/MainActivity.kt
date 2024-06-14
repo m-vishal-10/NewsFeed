@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sysaxiom.newsfeed.Model.Article
 import com.sysaxiom.newsfeed.Model.Welcome
 import com.sysaxiom.newsfeed.ui.theme.NewsFeedTheme
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -34,14 +34,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             NewsFeedTheme {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
 
-                    ) {
-                        sendRequest()
-                        //MyUi(newsData = newsData)
-                    }
+                ) {
+                    sendRequest()
+                    HomeScreen(newsData = newsData)
+                }
 
             }
         }
@@ -49,49 +49,53 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun sendRequest() {
+
         GlobalScope.launch(Dispatchers.IO) {
             val response = try {
-                RetrofitInstance.api.getHeadlines("en",
+                RetrofitInstance.api.getHeadlines(
+                    "en",
                     "Wipro",
                     "2024-06-11",
                     "relevancy",
-                    "b51b0aef13f14d77b766b0f309a5a788")
+                    "b51b0aef13f14d77b766b0f309a5a788"
+                )
 
-            }catch (e: IOException){
-                Toast.makeText(applicationContext, "io error: ${e.message}", Toast.LENGTH_SHORT).show()
+            } catch (e: IOException) {
+                Toast.makeText(applicationContext, "io error: ${e.message}", Toast.LENGTH_SHORT)
+                    .show()
                 return@launch
             }
-            if(response.isSuccessful && response.body() != null){
-                withContext(Dispatchers.Main){
+            print(response)
+            if (response.isSuccessful && response.body() != null) {
+                withContext(Dispatchers.Main) {
                     val newsData = response.body() ?: return@withContext
-                    //MyUi(newsData = newsData)
                 }
             }
         }
     }
+
     @Composable
-    fun MyUi(newsData: Welcome) {
+    fun HomeScreen(newsData: MutableList<Welcome>) {
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.Center) {
-            Text(text = "News",Modifier.padding(bottom = 25.dp), fontSize = 26.sp)
-            if (newsData.articles.isNotEmpty()) {
-                val articles = newsData.articles
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    items(articles.size) {index ->
-                        val article = articles[index]
-                        NewsCard(
-                            urlToImage = article?.urlToImage?:"",
-                            title = article?.title?:"",
-                            description = article?.description?:"",
-                            publishedAt = article?.publishedAt?:""
-                        )
-                    }
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "News", Modifier.padding(bottom = 25.dp, top = 25.dp), fontSize = 26.sp)
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+
+                items(5) {
+//                    index -> val article = articles[index]
+                    NewsCard(
+                        urlToImage = "https://www.livemint.com/lm-img/img/2024/06/13/1600x900/VISA-SF-OFFICE-14_1717619013261_1718260431430.jpg",//article?.urlToImage ?: "",
+                        title = "Bodies of 46 victims who died in Kuwait fire reach Kerala",//article?.title ?: ,
+                        description = "23 of the 46 victims are from Kerala, seven from Tamil Nadu, four from Uttar Pradesh, three from Andhra Pradesh and two each from Bihar and Odisha. The victims also include one person each from Jharkhand, Karnataka, Maharashtra, Punjab and West Bengal.",//article?.description ?: "",
+                        publishedAt = "2024-06-13T06:48:08Z"//article?.publishedAt ?: ""
+                    )
                 }
             }
 
