@@ -19,11 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 
+@Suppress("DEPRECATION")
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +48,7 @@ class SplashActivity : ComponentActivity() {
     fun Navigation() {
         val navController = rememberNavController()
         NavHost(navController = navController, startDestination = "splash_screen") {
-            composable("splash_screen") { SplashScreen(navController = navController) }
+            composable("splash_screen") { SplashScreen() }
             composable("main_screen") {
                 MainActivity()
             }
@@ -56,12 +56,16 @@ class SplashActivity : ComponentActivity() {
     }
 
     @Composable
-    fun SplashScreen(navController: NavController) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().background(color=Color.White)) {
+    fun SplashScreen() {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier
+            .fillMaxSize()
+            .background(color = Color.White)) {
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Logo",
-                modifier = Modifier.width(400.dp).height(400.dp)
+                modifier = Modifier
+                    .width(400.dp)
+                    .height(400.dp)
 
             )
         }
