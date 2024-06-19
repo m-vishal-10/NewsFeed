@@ -1,5 +1,6 @@
 package com.sysaxiom.newsfeed
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,13 +27,19 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.google.gson.Gson
 import com.sysaxiom.newsfeed.model.Article
 import com.sysaxiom.newsfeed.ui.theme.NewsFeedTheme
 import kotlinx.coroutines.flow.StateFlow
 
 class MainActivity : ComponentActivity() {
     private val viewModel = MainViewModel()
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,16 +51,38 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
 
                 ) {
-                    HomeScreen(viewModel.filteredArticles)
+                    NavigationGraph()
                 }
-
             }
         }
         viewModel.sendRequest()
     }
 
     @Composable
-    fun HomeScreen(newsData: StateFlow<List<Article?>>) {
+    fun NavigationGraph() {
+        val navController = rememberNavController()
+        NavHost(navController = navController, startDestination = Screen.HomeScreen.route) {
+            composable(route = Screen.HomeScreen.route) {
+                HomeScreen(navController, viewModel.filteredArticles)
+            }
+            composable(
+                route = Screen.DetailScreen.route + "/{article}",
+                arguments = listOf(
+                    navArgument("article") {
+                        type = NavType.StringType
+                    }
+                )
+            ) { entry ->
+                val articleJson = entry.arguments?.getString("article")
+                val article = Gson().fromJson(articleJson, Article::class.java)
+                DetailScreen(article)
+            }
+        }
+
+    }
+
+    @Composable
+    fun HomeScreen(navController: NavController, newsData: StateFlow<List<Article?>>) {
 
         val newsDataState by newsData.collectAsState(initial = emptyList())
 
@@ -99,7 +128,16 @@ class MainActivity : ComponentActivity() {
                             urlToImage = article?.urlToImage ?: "",
                             title = article?.title ?: "",
                             description = article?.description ?: "",
-                            publishedAt = article?.publishedAt ?: ""
+                            publishedAt = article?.publishedAt ?: "",
+                            onClick = {
+                                val articleJson = Gson().toJson(article)
+                                val encodedArticleJson = Uri.encode(articleJson)
+                                navController.navigate(
+                                    Screen.DetailScreen.withArgs(
+                                        encodedArticleJson
+                                    )
+                                )
+                            }
                         )
                     }
                 }

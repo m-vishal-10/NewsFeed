@@ -23,24 +23,26 @@ import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 
 @Composable
-fun NewsCard(urlToImage: String, title: String, description: String, publishedAt: String) {
+fun NewsCard(
+    urlToImage: String,
+    title: String,
+    description: String,
+    publishedAt: String,
+    onClick: () -> Unit
+) {
     OutlinedCard(
         modifier = Modifier
             .padding(10.dp)
             .height(200.dp)
             .fillMaxWidth()
             .wrapContentHeight()
-            .clickable { TODO("navigate to detail screen") },
+            .clickable { onClick() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
-
         )
-    )
-    {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Image(
                     painter = rememberAsyncImagePainter(urlToImage),
@@ -56,7 +58,6 @@ fun NewsCard(urlToImage: String, title: String, description: String, publishedAt
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
-            
             Column {
                 Text(
                     text = title,
