@@ -15,8 +15,13 @@ class MainViewModel : ViewModel() {
     private var newsData: Welcome? = null
     private val _filteredArticles = MutableStateFlow<List<Article?>>(emptyList())
     val filteredArticles: StateFlow<List<Article?>> = _filteredArticles.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     fun sendRequest() {
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val response = RetrofitInstance.api.getHeadlines(
                     "en",
@@ -33,17 +38,18 @@ class MainViewModel : ViewModel() {
                 }
             } catch (e: IOException) {
                 println("IO Exception: ${e.message}")
+            }finally {
+                _isLoading.value = false
             }
+
         }
     }
 
     fun filterArticles(query: String) {
         viewModelScope.launch {
-            viewModelScope.launch {
-                newsData?.articles?.let { articles ->
-                    _filteredArticles.value = articles.filter { article ->
-                        article?.title?.contains(query, ignoreCase = true) == true
-                    }
+            newsData?.articles?.let { articles ->
+                _filteredArticles.value = articles.filter { article ->
+                    article?.title?.contains(query, ignoreCase = true) == true
                 }
             }
         }

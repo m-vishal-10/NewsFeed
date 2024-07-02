@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "601857872162",
+    "project_id": "newsfeed-8ea41",
+    "storage_bucket": "newsfeed-8ea41.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:601857872162:android:20b3b8516f7958b073157b",
+        "android_client_info": {
+          "package_name": "com.sysaxiom.newsfeed"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "601857872162-n2h7km42jqihl3kl0crtq61ivlmt8bbs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7bVpC0dy1hfYdTZdmKVyiWkibe5ji9Ok"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "601857872162-n2h7km42jqihl3kl0crtq61ivlmt8bbs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
