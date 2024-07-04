@@ -1,5 +1,6 @@
 package com.sysaxiom.newsfeed
 
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sysaxiom.newsfeed.model.Article
@@ -16,12 +17,11 @@ class MainViewModel : ViewModel() {
     private val _filteredArticles = MutableStateFlow<List<Article?>>(emptyList())
     val filteredArticles: StateFlow<List<Article?>> = _filteredArticles.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    val isLoading = MutableLiveData<Boolean>()
 
     fun sendRequest() {
         viewModelScope.launch {
-            _isLoading.value = true
+            isLoading.value = true
             try {
                 val response = RetrofitInstance.api.getHeadlines(
                     "en",
@@ -39,7 +39,7 @@ class MainViewModel : ViewModel() {
             } catch (e: IOException) {
                 println("IO Exception: ${e.message}")
             }finally {
-                _isLoading.value = false
+                isLoading.value = false
             }
 
         }

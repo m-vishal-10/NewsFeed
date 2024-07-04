@@ -3,9 +3,12 @@ package com.sysaxiom.newsfeed
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,13 +18,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -33,10 +33,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +49,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -54,6 +58,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.gson.Gson
 import com.sysaxiom.newsfeed.model.Article
 import com.sysaxiom.newsfeed.ui.theme.NewsFeedTheme
@@ -61,9 +73,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
 class MainActivity : ComponentActivity() {
-
-    private val viewModel = MainViewModel()
-
+    private val mainViewModel: MainViewModel by lazy {
+        ViewModelProvider(this)[MainViewModel::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,21 +90,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        viewModel.sendRequest()
+        mainViewModel.sendRequest()
     }
 
     @Composable
     fun NavigationGraph() {
         val navController = rememberNavController()
+        FirebaseApp.initializeApp(this)
+
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.web_client_id))
+            .requestEmail()
+            .build()
+
+        var googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        var auth = FirebaseAuth.getInstance()
+
         NavHost(navController = navController, startDestination = "splash_screen") {
             composable("splash_screen") {
                 SplashScreen(navController)
             }
-            composable("login_screen") {
-                LoginScreen(navController)
+            composable("google_sign_in") {
+                GoogleSignInUI(googleSignInClient, auth, navController)
             }
             composable("main_screen") {
-                HomeScreen(navController, viewModel.filteredArticles)
+                HomeScreen(navController, mainViewModel.filteredArticles)
             }
             composable(
                 route = "detail_screen/{article}",
@@ -125,7 +148,8 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             delay(1500)
-            navController.navigate("login_screen") {
+            //TODO :- navigate to sign in screen
+            navController.navigate("google_sign_in") {
                 popUpTo("splash_screen") { inclusive = true }
             }
         }
@@ -134,7 +158,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun HomeScreen(navController: NavController, newsData: StateFlow<List<Article?>>) {
         val newsDataState by newsData.collectAsState(initial = emptyList())
-        val isLoading by viewModel.isLoading.collectAsState(initial = false)
+        val isLoading = mainViewModel.isLoading.observeAsState()
 
         val searchText = remember {
             mutableStateOf("")
@@ -160,7 +184,7 @@ class MainActivity : ComponentActivity() {
                         .fillMaxWidth(),
                     onValueChange = {
                         searchText.value = it
-                        viewModel.filterArticles(it)
+                        mainViewModel.filterArticles(it)
                     },
                     placeholder = { Text(text = "search") },
                     label = { Text("Search News", color = Color.Black) },
@@ -170,12 +194,21 @@ class MainActivity : ComponentActivity() {
             Divider()
 
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.Blue)
-                }
-                else {
+                if (isLoading.value == true) {
+                    //TODO :- progress bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color.Blue,
+                            modifier = Modifier.scale(scaleX = 1.5f, scaleY = 1.5f)
+                        )
+                    }
 
-
+                } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
                     ) {
@@ -200,6 +233,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
             }
         }
     }
@@ -223,7 +257,6 @@ class MainActivity : ComponentActivity() {
                     .padding(top = 30.dp)
             ) {
                 IconButton(onClick = {
-
                     navController.popBackStack()
                 }) {
                     Icon(
@@ -253,7 +286,6 @@ class MainActivity : ComponentActivity() {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
-
             ) {
                 article?.let {
                     Spacer(modifier = Modifier.size(50.dp))
@@ -298,48 +330,78 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
     @Composable
-    fun LoginScreen(navController: NavController) {
+    fun GoogleSignInUI(
+        googleSignInClient: GoogleSignInClient,
+        auth: FirebaseAuth,
+        navController: NavHostController
+    ) {
+        var user by remember { mutableStateOf<FirebaseUser?>(null) }
 
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = "Logo"
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    navController.navigate("main_screen"){
-                        popUpTo("login_screen"){
-                            inclusive = true
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)!!
+                firebaseAuthWithGoogle(account.idToken!!, auth) { signedInUser ->
+                    user = signedInUser
+                    if (signedInUser != null) {
+                        navController.navigate("main_screen") {
+                            popUpTo("google_sign_in") { inclusive = true }
                         }
                     }
-                },
-                modifier = Modifier
-                    .padding(start = 16.dp, end = 16.dp),
-                shape = RoundedCornerShape(6.dp),
-                colors = ButtonDefaults.buttonColors(
-                    contentColor = Color.White
-                )
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_google),
-                    contentDescription = "",
-                    modifier = Modifier.size(24.dp)
-                )
-                Text(text = "Sign in with Google", modifier = Modifier.padding(6.dp))
+                }
+            } catch (e: ApiException) {
+                Log.w("SignIn", "Google sign in failed", e)
             }
-
         }
 
+        LaunchedEffect(Unit) {
+            user = auth.currentUser
+            if (user != null) {
+                navController.navigate("main_screen") {
+                    popUpTo("google_sign_in") { inclusive = true }
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (user == null) {
+                Button(
+                    onClick = {
+                        val signInIntent = googleSignInClient.signInIntent
+                        launcher.launch(signInIntent)
+                    }
+                ) {
+                    Text("Sign in with Google", color = Color.White)
+                }
+            }
+        }
     }
+
+    private fun firebaseAuthWithGoogle(
+        idToken: String,
+        auth: FirebaseAuth,
+        onResult: (FirebaseUser?) -> Unit
+    ) {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = auth.currentUser
+                    onResult(user)
+                } else {
+                    onResult(null)
+                }
+            }
+    }
+
 
 }
