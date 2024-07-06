@@ -1,14 +1,14 @@
+@file:Suppress("DEPRECATION")
+
 package com.sysaxiom.newsfeed
 
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,15 +30,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -59,13 +56,16 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.rememberAsyncImagePainter
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.tasks.Task
+import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.auth
 import com.google.gson.Gson
 import com.sysaxiom.newsfeed.model.Article
 import com.sysaxiom.newsfeed.ui.theme.NewsFeedTheme
@@ -73,6 +73,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
 class MainActivity : ComponentActivity() {
+    private lateinit var mGoogleSignInClient: GoogleSignInClient
+    private val reqCode: Int = 123
+    private lateinit var firebaseAuth: FirebaseAuth
+    private var isLoggedIn = mutableStateOf(false)
+
     private val mainViewModel: MainViewModel by lazy {
         ViewModelProvider(this)[MainViewModel::class.java]
     }
@@ -80,6 +85,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        FirebaseApp.initializeApp(this)
+        val gso =
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(getString(R.string.web_client_id))
+                .requestEmail()
+                .build()
+        mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
+        firebaseAuth = FirebaseAuth.getInstance()
+
         setContent {
             NewsFeedTheme {
                 Surface(
@@ -93,26 +107,47 @@ class MainActivity : ComponentActivity() {
         mainViewModel.sendRequest()
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == reqCode) {
+            val task: Task<GoogleSignInAccount> = GoogleSignIn.getSignedInAccountFromIntent(data)
+            handleResult(task)
+        }
+    }
+
+    private fun handleResult(completedTask: Task<GoogleSignInAccount>) {
+        try {
+            val account: GoogleSignInAccount? = completedTask.getResult(ApiException::class.java)
+            if (account != null) {
+                updateUi(account)
+            }
+        } catch (e: ApiException) {
+            Toast.makeText(this, e.toString(), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateUi(account: GoogleSignInAccount) {
+        val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+        firebaseAuth.signInWithCredential(credential).addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Toast.makeText(this, "Successfully LoggedIn", Toast.LENGTH_SHORT).show()
+                isLoggedIn.value = true
+            } else {
+                Toast.makeText(this, task.exception.toString(), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     @Composable
     fun NavigationGraph() {
         val navController = rememberNavController()
-        FirebaseApp.initializeApp(this)
-
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.web_client_id))
-            .requestEmail()
-            .build()
-
-        var googleSignInClient = GoogleSignIn.getClient(this, gso)
-
-        var auth = FirebaseAuth.getInstance()
 
         NavHost(navController = navController, startDestination = "splash_screen") {
             composable("splash_screen") {
                 SplashScreen(navController)
             }
             composable("google_sign_in") {
-                GoogleSignInUI(googleSignInClient, auth, navController)
+                GoogleSignInUi(navController, isLoggedIn)
             }
             composable("main_screen") {
                 HomeScreen(navController, mainViewModel.filteredArticles)
@@ -158,7 +193,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun HomeScreen(navController: NavController, newsData: StateFlow<List<Article?>>) {
         val newsDataState by newsData.collectAsState(initial = emptyList())
-        val isLoading = mainViewModel.isLoading.observeAsState()
+        //val isLoading = mainViewModel.isLoading.observeAsState()
 
         val searchText = remember {
             mutableStateOf("")
@@ -194,21 +229,21 @@ class MainActivity : ComponentActivity() {
             Divider()
 
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (isLoading.value == true) {
-                    //TODO :- progress bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color.Blue,
-                            modifier = Modifier.scale(scaleX = 1.5f, scaleY = 1.5f)
-                        )
-                    }
-
-                } else {
+//                if (isLoading.value == true) {
+//                    //TODO :- progress bar
+//                    Box(
+//                        modifier = Modifier
+//                            .fillMaxSize()
+//                            .background(Color.Black),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        CircularProgressIndicator(
+//                            color = Color.Blue,
+//                            modifier = Modifier.scale(scaleX = 1.5f, scaleY = 1.5f)
+//                        )
+//                    }
+//
+//                }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize()
                     ) {
@@ -232,8 +267,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                }
-
             }
         }
     }
@@ -331,83 +364,37 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun GoogleSignInUI(
-        googleSignInClient: GoogleSignInClient,
-        auth: FirebaseAuth,
-        navController: NavHostController
-    ) {
-        val context = LocalContext.current
-        var user by remember { mutableStateOf<FirebaseUser?>(null) }
-
-        val launcher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)!!
-                Log.d("SignIn", "firebaseAuthWithGoogle:" + account.id)
-                firebaseAuthWithGoogle(account.idToken!!, auth) { signedInUser ->
-                    user = signedInUser
-                    if (signedInUser != null) {
-                        Log.w("SignIn", "Google sign in success")
-                        navController.navigate("main_screen") {
-                            popUpTo("google_sign_in") { inclusive = true }
-                        }
-                    }
-                }
-            } catch (e: ApiException) {
-                Log.e("SignIn", "Google sign in failed", e)
-                Log.e("SignIn", "signInResult:failed code=${e.statusCode}, message=${e.message}")
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            user = auth.currentUser
-            if (user != null) {
-                navController.navigate("main_screen") {
-                    popUpTo("google_sign_in") { inclusive = true }
-                }
-            }
-        }
+    fun GoogleSignInUi(navController: NavController, isLoggedIn: MutableState<Boolean>) {
+        val user by remember { mutableStateOf(Firebase.auth.currentUser) }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (user == null) {
-                Button(
-                    onClick = {
-                        val signInIntent = googleSignInClient.signInIntent
-                        launcher.launch(signInIntent)
+                Text("Not logged in")
+                Button(onClick = {
+                    val signInIntent: Intent = mGoogleSignInClient.signInIntent
+                    startActivityForResult(signInIntent, reqCode)
+                }) {
+                    Text("Sign in via Google")
+                }
+            } else {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Logged In as ${user!!.displayName}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            LaunchedEffect(isLoggedIn.value) {
+                if (isLoggedIn.value) {
+                    navController.navigate("main_screen") {
+                        popUpTo("google_sign_in") { inclusive = true }
                     }
-                ) {
-                    Text("Sign in with Google", color = Color.White)
                 }
             }
         }
     }
-
-
-    private fun firebaseAuthWithGoogle(
-        idToken: String,
-        auth: FirebaseAuth,
-        onResult: (FirebaseUser?) -> Unit
-    ) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-
-                    val user = auth.currentUser
-                    onResult(user)
-                } else {
-                    onResult(null)
-                }
-            }
-    }
-
 
 }
