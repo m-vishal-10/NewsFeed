@@ -336,6 +336,7 @@ class MainActivity : ComponentActivity() {
         auth: FirebaseAuth,
         navController: NavHostController
     ) {
+        val context = LocalContext.current
         var user by remember { mutableStateOf<FirebaseUser?>(null) }
 
         val launcher = rememberLauncherForActivityResult(
@@ -344,16 +345,19 @@ class MainActivity : ComponentActivity() {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)!!
+                Log.d("SignIn", "firebaseAuthWithGoogle:" + account.id)
                 firebaseAuthWithGoogle(account.idToken!!, auth) { signedInUser ->
                     user = signedInUser
                     if (signedInUser != null) {
+                        Log.w("SignIn", "Google sign in success")
                         navController.navigate("main_screen") {
                             popUpTo("google_sign_in") { inclusive = true }
                         }
                     }
                 }
             } catch (e: ApiException) {
-                Log.w("SignIn", "Google sign in failed", e)
+                Log.e("SignIn", "Google sign in failed", e)
+                Log.e("SignIn", "signInResult:failed code=${e.statusCode}, message=${e.message}")
             }
         }
 
@@ -386,6 +390,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
     private fun firebaseAuthWithGoogle(
         idToken: String,
         auth: FirebaseAuth,
@@ -395,6 +400,7 @@ class MainActivity : ComponentActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
+
                     val user = auth.currentUser
                     onResult(user)
                 } else {
