@@ -28,7 +28,7 @@ class MainViewModel : ViewModel() {
                     "hi",
                     "2024-06-11",
                     "relevancy",
-                    "b51b0aef13f14d77b766b0f309a5a788"
+                    API_Key
                 )
                 if (response.isSuccessful) {
                     response.body()?.let { news ->
